@@ -29,7 +29,7 @@ The lighting pattern is defined as follows.
 ## Node Graph
 ![node graph](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/eve-autonomy/warning_lamp_manager/docs/node_graph.pu)
 
-## Lanch argument
+## Lanch arguments
 |Name                   |Description|
 |:----------------------|:----------|
 |use_overridable_vehicle|Changing this value also reflects the value of the parameter with the same name.|
