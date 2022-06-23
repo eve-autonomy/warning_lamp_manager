@@ -3,7 +3,7 @@
 ## Overview
 This node controls warning and emergency lamps through `/dio_ros_driver` to alert pedestrians and vehicle drivers.
 
-The lighting pattern is defined as follows.
+Lighting patterns are defined as follows.
 - warning lamp
   - Lights up whenever the vehicle may move automatically to alert pedestrians around.
   - Always lit in manual mode. 
