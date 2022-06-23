@@ -30,7 +30,7 @@ Lighting patterns are defined as follows.
 ## Lanch arguments
 |Name                   |Description|
 |:----------------------|:----------|
-|use_overridable_vehicle|Changing this value also reflects the value of the parameter with the same name.|
+|use_overridable_vehicle|If autonomous driving vehicle has a function of override, set this parameter as `TRUE`. Otherwise set as `FALSE`. This value overrides on a parameter with same name.|
 
 ## Paramater description
 |Name                   |Description|
