@@ -4,17 +4,14 @@
 This node controls warning and emergency lamps through `/dio_ros_driver` to alert pedestrians and vehicle drivers.
 
 Lighting patterns are defined as follows.
-- warning lamp
-  - Lights up whenever the vehicle may move automatically to alert pedestrians around.
-  - Always lit in manual mode. 
-  - Lights up immediately after the system boots for daily inspection.
-  - Always lit during the system shutdown process to alert the user not to accidentally remove the external storage medium.
-  - Keeps going off in other cases.
-- emergency lamp
-  - Always lights up when the operation is stopped due to a system error.
-  - Lights up the moment the vehicle starts.
-  - Lights up immediately after the system boots for daily inspection.
-  - Keeps going off in other cases.
+|Name                   | Mode |Description|
+|:----------------------|:---|:----------|
+| Warning lamp | Always ON | - Autonomous driving vehicle is in driving mode to alert surrounding pedestrians. <br> - On manual omde. <br> - During system is in shutting down process to prevent not to remove external data storage. |
+| " | One time ON | - When autonomous driving system boots up, system checks this lamp. |
+| " | OFF | - Other cases |
+| Emergency lamp | Always ON | - When the operation is stopped due to a system error |
+| " | One time ON | - When the Autoware receives a engage topic. <br> - When autonomous driving system boots up, system checks this lamp. |
+| " | OFF | - Other cases |
 
 ## Input and Output
 - input
