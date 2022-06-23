@@ -1,4 +1,4 @@
-# warning_lamp_manager
+# Warning lamp manager
 
 ## Overview
 This node controls warning lamps to alert nearby pedestrians and vehicles.
