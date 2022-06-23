@@ -35,4 +35,4 @@ Lighting patterns are defined as follows.
 ## Paramater description
 |Name                   |Description|
 |:----------------------|:----------|
-|use_overridable_vehicle|Whether the vehicle can transfer driving authority by the operator's brakes.|
+|use_overridable_vehicle|If autonomous driving vehicle has a function of override, set this parameter as `TRUE`. Otherwise set as `FALSE`.|
