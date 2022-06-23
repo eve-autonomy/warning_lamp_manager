@@ -1,9 +1,7 @@
 # Warning lamp manager
 
 ## Overview
-This node controls warning lamps to alert nearby pedestrians and vehicles.
-
-This is supposed to selectively control the two types of lamps; warning lamp and emergency lamp.
+This node controls warning and emergency lamps through `/dio_ros_driver` to alert pedestrians and vehicle drivers.
 
 The lighting pattern is defined as follows.
 - warning lamp
