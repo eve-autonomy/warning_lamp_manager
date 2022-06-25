@@ -22,7 +22,7 @@ Lighting patterns are defined as follows.
     - `/dio/dout1` : GPIO output topic for emergency lamp. (this topic is remapping from lamp_emergency_out)
     - `/dio/dout2` : GPIO output topic for warning lamp. (this topic is remapping from lamp_warning_out)
 ## Node Graph
-![node graph](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/eve-autonomy/warning_lamp_manager/main/docs/node_graph.pu)
+![node graph](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/eve-autonomy/warning_lamp_manager/main/docs/node_graph.pu)
 
 ## Lanch arguments
 |Name                   |Description|
