@@ -40,10 +40,8 @@ const char * getServiceLayerStateName(uint16_t state)
       return "STATE_WAITING_CALL_PERMISSION";
     case autoware_state_machine_msgs::msg::StateMachine::STATE_ARRIVED_GOAL:
       return "STATE_ARRIVED_GOAL";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_DRIVING:
-      return "STATE_DRIVING";
     default:
-      return "UNKNOWN";
+      return "DEFAULT";
   }
 }
 }  // namespace
