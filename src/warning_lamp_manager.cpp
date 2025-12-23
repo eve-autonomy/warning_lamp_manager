@@ -12,12 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-#include <fstream>
-
 #include "warning_lamp_manager/warning_lamp_manager.hpp"
 
 namespace warning_lamp_manager
 {
+
+namespace
+{
+const char* getServiceLayerStateName(uint16_t state)
+{
+  switch (state) {
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED:
+      return "STATE_UNDEFINED";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_CHECK_NODE_ALIVE:
+      return "STATE_CHECK_NODE_ALIVE";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_EMERGENCY_STOP:
+      return "STATE_EMERGENCY_STOP";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_ENGAGE:
+      return "STATE_INFORM_ENGAGE";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_RESTART:
+      return "STATE_INFORM_RESTART";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_DURING_RECEIVE_ROUTE:
+      return "STATE_DURING_RECEIVE_ROUTE";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_ENGAGE_INSTRUCTION:
+      return "STATE_WAITING_ENGAGE_INSTRUCTION";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_CALL_PERMISSION:
+      return "STATE_WAITING_CALL_PERMISSION";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_ARRIVED_GOAL:
+      return "STATE_ARRIVED_GOAL";
+    case autoware_state_machine_msgs::msg::StateMachine::STATE_DRIVING:
+      return "STATE_DRIVING";
+    default:
+      return "UNKNOWN";
+  }
+}
+}  // namespace
 
 WarningLampManager::WarningLampManager(
   const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
@@ -26,39 +55,18 @@ WarningLampManager::WarningLampManager(
   use_overridable_vehicle_ = this->declare_parameter<bool>(
     "use_overridable_vehicle", true);
 
-  sub_state_ = this->create_subscription<autoware_state_machine_msgs::msg::StateMachine>(
-    "autoware_state_machine/state",
-    rclcpp::QoS{3}.transient_local(),
-    std::bind(&WarningLampManager::callbackStateMessage, this, std::placeholders::_1)
-  );
-
-  // autoware_state
   sub_initilization_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::LocalizationInitializationState>(
     "/api/localization/initialization_state",
     rclcpp::QoS{3}.transient_local(),
     std::bind(&WarningLampManager::callbackAutowareInitializationMessage, this, std::placeholders::_1)
   );
 
-  // routing wait state
   sub_routing_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::RouteState>(
     "/api/routing/state",
     rclcpp::QoS{3}.transient_local(),
     std::bind(&WarningLampManager::callbackRoutingStateMessage, this, std::placeholders::_1)
   );
 
-  // daignostics struct for EM Holding
-  sub_daignostics_struct_ = this->create_subscription<autoware_adapi_v1_msgs::msg::DiagGraphStruct>(
-    "/api/system/diagnostics/struct",
-    rclcpp::QoS{3}.transient_local(),
-    std::bind(&WarningLampManager::callbackDaignosticsStructMessage, this, std::placeholders::_1)
-  );
-  sub_daignostics_status_ = this->create_subscription<autoware_adapi_v1_msgs::msg::DiagGraphStatus>(
-    "/api/system/diagnostics/status",
-    rclcpp::QoS{3}.transient_local(),
-    std::bind(&WarningLampManager::callbackDaignosticsStateMessage, this, std::placeholders::_1)
-  );
-
-  // OperationModeState
   sub_operation_mode_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::OperationModeState>(
     "/api/operation_mode/state",
     rclcpp::QoS{3}.transient_local(),
@@ -72,19 +80,28 @@ WarningLampManager::WarningLampManager(
     std::bind(&WarningLampManager::callbackVehicleStateMessage, this, std::placeholders::_1)
   );
 
-  // delivery reservation state
   sub_delivery_reservation_state_ = this->create_subscription<autoware_state_machine_msgs::msg::StateLock>(
     "/go_interface/lock_state",
     rclcpp::QoS{3}.transient_local(),
     std::bind(&WarningLampManager::callbackDeliveryReservationMessage, this, std::placeholders::_1)
   );
 
-  // TODO:eve_cmd_gateからengage状態をもらう、topic名とメッセージ型を反映
-  // engage process state
-  sub_engage_process_state_ = this->create_subscription<autoware_state_machine_msgs::msg::StateMachine>(
-    "xxxxx/xxxx",
+  sub_engage_process_state_ = this->create_subscription<eve_cmd_gate_msgs::msg::EngageRequestState>(
+    "/eve_cmd_gate/engage_request_state",
     rclcpp::QoS{3}.transient_local(),
     std::bind(&WarningLampManager::callbackEngageProcessMessage, this, std::placeholders::_1)
+  );
+
+  sub_hazard_status_ = this->create_subscription<autoware_system_msgs::msg::HazardStatusStamped>(
+    "/system/emergency/hazard_status",
+    rclcpp::QoS{3}.transient_local(),
+    std::bind(&WarningLampManager::callbackHazardStatusMessage, this, std::placeholders::_1)
+  );
+
+  sub_motion_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::MotionState>(
+    "/api/motion/state",
+    rclcpp::QoS{3}.transient_local(),
+    std::bind(&WarningLampManager::callbackMotionStateMessage, this, std::placeholders::_1)
   );
 
   pub_warning_lamp_emergency_ = this->create_publisher<dio_ros_driver::msg::DIOPort>(
@@ -95,13 +112,13 @@ WarningLampManager::WarningLampManager(
     rclcpp::QoS{3}.transient_local());
 
   active_polarity_ = ACTIVE_POLARITY;
-  em_holding_indices_ = std::nullopt;
+  em_holding_ = false;
+  motion_state_ = autoware_adapi_v1_msgs::msg::MotionState::UNKNOWN;
   service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED;
   control_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::MANUAL;
   initilization_state_ = autoware_adapi_v1_msgs::msg::LocalizationInitializationState::UNKNOWN;
   routing_state_ = autoware_adapi_v1_msgs::msg::RouteState::UNKNOWN;
   delivery_reservation_state_ = autoware_state_machine_msgs::msg::StateLock::STATE_OFF;
-  em_holding_ = false;
   operation_state_.is_autoware_control_enabled = false;
   operation_state_.is_in_transition = false;
   operation_state_.is_stop_mode_available = false;
@@ -117,20 +134,6 @@ WarningLampManager::~WarningLampManager()
 {
   controlLampWarning(false);
   controlLampEmergency(false);
-}
-
-void WarningLampManager::callbackStateMessage(
-  const autoware_state_machine_msgs::msg::StateMachine::ConstSharedPtr msg)
-{
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(),
-    *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackStateMessage]"
-    "service_layer_state: %u, control_layer_state: %u",
-    msg->service_layer_state,
-    msg->control_layer_state);
-
-  warningLampManager(msg->service_layer_state, msg->control_layer_state);
 }
 
 void WarningLampManager::callbackAutowareInitializationMessage(
@@ -161,45 +164,6 @@ void WarningLampManager::callbackRoutingStateMessage(
 
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
-}
-
-void WarningLampManager::callbackDaignosticsStructMessage(
-  const autoware_adapi_v1_msgs::msg::DiagGraphStruct::ConstSharedPtr msg)
-{
-  auto nodes = msg->nodes;
-
-  for (uint16_t i = 0; i < nodes.size(); ++i) {
-    if (nodes[i].path == "/autoware/modes/autonomous") {
-      em_holding_indices_ = i;
-      RCLCPP_INFO_THROTTLE(
-        this->get_logger(),
-        *this->get_clock(), 1.0,
-        "[WarningLampManager::callbackDaignosticsStructMessage]daignostics_graph /autoware/modes/autonomous index: %u", i);
-      break;
-    }
-  }
-}
-
-void WarningLampManager::callbackDaignosticsStateMessage(
-  const autoware_adapi_v1_msgs::msg::DiagGraphStatus::ConstSharedPtr msg)
-{
-  auto nodes = msg->nodes;
-  if (em_holding_indices_ != std::nullopt) {
-    // TODO:Ph3にて、levelをlatch_levelに変更
-    if (nodes[em_holding_indices_.value()].level == diagnostic_msgs::msg::DiagnosticStatus::ERROR) {
-      em_holding_ = true;
-      RCLCPP_INFO_THROTTLE(
-        this->get_logger(),
-        *this->get_clock(), 1.0,
-        "[WarningLampManager::callbackDaignosticsStateMessage]/autoware/modes/autonomous latch_level: %u",
-        nodes[em_holding_indices_.value()].level);// TODO:Ph3にて、levelをlatch_levelに変更
-    } else {
-      em_holding_ = false;
-    }
-
-    changeState();
-    warningLampManager(service_layer_state_, control_layer_state_);
-  }
 }
 
 void WarningLampManager::callbackOperationModeStateMessage(
@@ -246,17 +210,44 @@ void WarningLampManager::callbackDeliveryReservationMessage(
 }
 
 void WarningLampManager::callbackEngageProcessMessage(
-  const autoware_state_machine_msgs::msg::StateMachine::ConstSharedPtr msg)
+  const eve_cmd_gate_msgs::msg::EngageRequestState::ConstSharedPtr msg)
 {
   RCLCPP_INFO_THROTTLE(
     this->get_logger(),
     *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackEngageProcessMessage]"
-    "request: %u, accept: %u",
-    msg->service_layer_state, msg->control_layer_state);
-//    msg->request, msg->accept);
+    "[WarningLampManager::callbackEngageProcessMessage]engage_request_state: %u, %u",
+    msg->is_engage_requesting, msg->is_engage_accepted);
 
-  //setEngageProcess(msg->request, msg->accept);
+  is_engage_requesting_ = msg->is_engage_requesting;
+  is_engage_accepted_ = msg->is_engage_accepted;
+  changeState();
+  warningLampManager(service_layer_state_, control_layer_state_);
+}
+
+void WarningLampManager::callbackHazardStatusMessage(
+  const autoware_system_msgs::msg::HazardStatusStamped::ConstSharedPtr msg)
+{
+  em_holding_ = msg->status.emergency_holding;
+  RCLCPP_INFO_THROTTLE(
+    this->get_logger(),
+    *this->get_clock(), 1.0,
+    "[WarningLampManager::callbackHazardStatusMessage]emergency_holding: %s",
+    em_holding_ ? "true" : "false");
+
+  changeState();
+  warningLampManager(service_layer_state_, control_layer_state_);
+}
+
+void WarningLampManager::callbackMotionStateMessage(
+  const autoware_adapi_v1_msgs::msg::MotionState::ConstSharedPtr msg)
+{
+  motion_state_ = msg->state;
+  RCLCPP_INFO_THROTTLE(
+    this->get_logger(),
+    *this->get_clock(), 1.0,
+    "[WarningLampManager::callbackMotionStateMessage]motion_state: %u",
+    motion_state_);
+
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
 }
@@ -322,215 +313,101 @@ void WarningLampManager::warningLampManager(
   }
 }
 
-void WarningLampManager::setEngageProcess(bool request, bool accept)
-{
-  /* In multi-threaded system, there is a possibility of simultaneous accesses from different
-     threads, so exclusion control is performed. Set request to "true" when we want the audio to
-     play when vehicle departs and restarts. Set accept to "true" when the audio playback is
-     complete. If you want to suspend waiting for playback to complete for some reason, set both
-     values to "false". */
-  std::lock_guard<std::shared_mutex> lock(mtx_);
-  is_engage_requesting_ = request;
-  is_engage_accepted_ = accept;
-}
-
-std::pair<bool, bool> WarningLampManager::getEngageProcess()
-{
-  /* In multi-threaded system, there is a possibility of simultaneous accesses from different
-     threads, so exclusion control is performed. Check both values to determine if the playback is
-     played, interrupted, or completed. */
-  std::pair<bool, bool> value;
-  {
-    std::shared_lock<std::shared_mutex> lock(mtx_);
-    value = std::make_pair(is_engage_requesting_, is_engage_accepted_);
-  }
-  return value;
-}
-
 bool WarningLampManager::isAutowareStateOfWaitingForRoute(void)
 {
-  if (initilization_state_ != autoware_adapi_v1_msgs::msg::LocalizationInitializationState::INITIALIZING) {
-    return false;
-  }
-  if (routing_state_ != autoware_adapi_v1_msgs::msg::RouteState::UNSET) {
-    return false;
-  }
-
-  return true;
+  return initilization_state_ == autoware_adapi_v1_msgs::msg::LocalizationInitializationState::INITIALIZED &&
+         routing_state_ == autoware_adapi_v1_msgs::msg::RouteState::UNSET;
 }
 
 bool WarningLampManager::isAutowareStateOfPlanning(void)
 {
-  if (routing_state_ != autoware_adapi_v1_msgs::msg::RouteState::SET) {
-    return false;
-  }
-
-  return true;
-}
-
-bool WarningLampManager::isAutowareStateOfWaitingForEngage(void)
-{
-  if(operation_state_.mode != autoware_adapi_v1_msgs::msg::OperationModeState::AUTONOMOUS) {
-    return false;
-  }
-  if (routing_state_ != autoware_adapi_v1_msgs::msg::RouteState::SET) {
-    return false;
-  }
-
-  return true;
+  return routing_state_ == autoware_adapi_v1_msgs::msg::RouteState::SET && operation_state_.is_autonomous_mode_available;
 }
 
 bool WarningLampManager::isAutowareStateOfDriving(void)
 {
-  if(operation_state_.mode != autoware_adapi_v1_msgs::msg::OperationModeState::AUTONOMOUS) {
-    return false;
-  }
-
-  return true;
+  return operation_state_.mode == autoware_adapi_v1_msgs::msg::OperationModeState::AUTONOMOUS && motion_state_ == autoware_adapi_v1_msgs::msg::MotionState::MOVING;
 }
 
 bool WarningLampManager::isAutowareStateOfArrivedGoal(void)
 {
-  if (routing_state_ != autoware_adapi_v1_msgs::msg::RouteState::ARRIVED) {
-    return false;
-  }
-
-  // flag_arrived_state_machine_ = true;
-  return true;
+  return routing_state_ == autoware_adapi_v1_msgs::msg::RouteState::ARRIVED;
 }
 
 
 bool WarningLampManager::checkStateInformEngage(void)
 {
-  if (isAutowareStateOfDriving() != true){
-    return false;
-  }
-
-  if (service_layer_state_ == autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_ENGAGE_INSTRUCTION) {
-    if (flag_calls_vehicle_voice_ == true || delivery_reservation_state_ == autoware_state_machine_msgs::msg::StateLock::STATE_ON) {
-      return false;
-    }
-  }
-
-  auto [is_request, is_accept] = getEngageProcess();
-  if (is_request == false || delivery_reservation_state_ == autoware_state_machine_msgs::msg::StateLock::STATE_VERIFICATION) {
-      return false;
-  }
-
-  return true;
+  return operation_state_.mode == autoware_adapi_v1_msgs::msg::OperationModeState::AUTONOMOUS && operation_state_.is_autoware_control_enabled && motion_state_ == autoware_adapi_v1_msgs::msg::MotionState::STARTING;
 }
 
 bool WarningLampManager::checkStateInformRestart(void)
 {
-  if (isAutowareStateOfDriving() != true){
-    return false;
-  }
-
-  /* If restart is requested, voice guidance will be played. */
-  auto [is_request, is_accept] = getEngageProcess();
-  if (!is_request || is_accept) {  
-    return false;
-  }
-
-  return true;
+  return is_engage_requesting_ && !is_engage_accepted_;
 }
+
+## 
 
 bool WarningLampManager::checkState4DuringReceiveRoute(void)
 {
-  if (isAutowareStateOfWaitingForRoute() != true &&
-      isAutowareStateOfPlanning() != true){
-    return false;
-  }
-
-  return true;
+  return isAutowareStateOfWaitingForRoute();
 }
 
 bool WarningLampManager::checkStateWaitingEngageInstruction(void)
 {
-  if(control_layer_state_ != autoware_state_machine_msgs::msg::StateMachine::MANUAL) {
-    return false;
-  }
-
-  if (isAutowareStateOfDriving() != true){
-    return false;
-  }
-
-  return true;
+  return operation_state_.mode == autoware_adapi_v1_msgs::msg::OperationModeState::STOP && routing_state_ == autoware_adapi_v1_msgs::msg::RouteState::SET;
 }
 
 bool WarningLampManager::checkStateWaitingCallPermission(void)
 {
-  if (isAutowareStateOfDriving() != true){
-    return false;
-  }
-
-  // delivery_reservation_state_ は追加トピックから取得予定
-  if ((flag_calls_vehicle_voice_ != true) || 
-      (delivery_reservation_state_ != autoware_state_machine_msgs::msg::StateLock::STATE_ON)) {
-      return false;
-  }
-
-  return true;  
+  return isAutowareStateOfDriving() &&
+         flag_calls_vehicle_voice_ &&
+         delivery_reservation_state_ == autoware_state_machine_msgs::msg::StateLock::STATE_ON;
 }
 
 bool WarningLampManager::checkState4Arrived(void)
 {
-  if (isAutowareStateOfArrivedGoal() != true){
-    return false;
-  }
-
-  return true;  
+  return isAutowareStateOfArrivedGoal();
 }
 
 void WarningLampManager::changeState(void)
 {
-  if (service_layer_state_ == autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED) { 
-    // STATE_CHECK_NODE_ALIVE
+  if (service_layer_state_ == autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_CHECK_NODE_ALIVE;
-
-  } else if (em_holding_ == true) {
-    //setEngageProcess(false, false);
-    // STATE_EMERGENCY_STOP
+  } else if (em_holding_) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_EMERGENCY_STOP;
-
-  } else if (checkStateInformEngage() == true) {
-    // STATE_INFORM_ENGAGE
-    //setEngageProcess(false, true);
+  } else if (checkStateInformEngage()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_ENGAGE;
-
-  } else if (checkStateInformRestart() == true) {
-    // STATE_INFORM_RESTART
+  } else if (checkStateInformRestart()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_RESTART;
-
-  } else if (checkState4DuringReceiveRoute() == true) {
-    // STATE_DURING_RECEIVE_ROUTE
-    //setEngageProcess(false, false);
+  } else if (checkState4DuringReceiveRoute()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_DURING_RECEIVE_ROUTE;
-
-  } else if (checkStateWaitingEngageInstruction() == true) {
-    // STATE_WAITING_ENGAGE_INSTRUCTION
+  } else if (checkStateWaitingEngageInstruction()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_ENGAGE_INSTRUCTION;
-
-  } else if (checkStateWaitingCallPermission() == true) {
-    // STATE_WAITING_CALL_PERMISSION
+  } else if (checkStateWaitingCallPermission()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_CALL_PERMISSION;
-
-  } else if (checkState4Arrived() == true) {
-    // STATE_ARRIVED_GOAL
-    //setEngageProcess(false, false);    
+  } else if (checkState4Arrived()) {
     service_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::STATE_ARRIVED_GOAL;
-
   } else {
-    // 上記以外
     service_layer_state_ = 0xFFFF;
   }
 
-  if ((operation_state_.is_stop_mode_available == true) ||
-      (operation_state_.is_local_mode_available == true)) {
+  if (operation_state_.is_autoware_control_enabled == false) {
     control_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::MANUAL;
   } else {
     control_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::AUTO;
   }
+
+  RCLCPP_INFO_THROTTLE(
+    this->get_logger(),
+    *this->get_clock(), 1.0,
+    "[WarningLampManager::changeState] service_layer_state: %s, control_layer_state: %s, "
+    "operation_mode: %u, motion_state: %u, is_autoware_control_enabled: %s, em_holding: %s",
+    getServiceLayerStateName(service_layer_state_),
+    control_layer_state_ == autoware_state_machine_msgs::msg::StateMachine::MANUAL ? "MANUAL" : "AUTO",
+    operation_state_.mode,
+    motion_state_,
+    operation_state_.is_autoware_control_enabled ? "true" : "false",
+    em_holding_ ? "true" : "false");
 }
 
 }  // namespace warning_lamp_manager
