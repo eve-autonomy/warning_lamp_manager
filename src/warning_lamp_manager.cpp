@@ -83,7 +83,7 @@ WarningLampManager::WarningLampManager(const rclcpp::NodeOptions & options = rcl
     std::bind(&WarningLampManager::callbackEngageProcessMessage, this, std::placeholders::_1));
 
   sub_hazard_status_ = this->create_subscription<autoware_system_msgs::msg::HazardStatusStamped>(
-    "/system/emergency/hazard_status", rclcpp::QoS{3}.transient_local(),
+    "/system/emergency/hazard_status", rclcpp::QoS{1},
     std::bind(&WarningLampManager::callbackHazardStatusMessage, this, std::placeholders::_1));
 
   sub_motion_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::MotionState>(
