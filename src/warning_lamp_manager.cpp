@@ -17,35 +17,6 @@
 namespace warning_lamp_manager
 {
 
-namespace
-{
-const char * getServiceLayerStateName(uint16_t state)
-{
-  switch (state) {
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED:
-      return "STATE_UNDEFINED";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_CHECK_NODE_ALIVE:
-      return "STATE_CHECK_NODE_ALIVE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_EMERGENCY_STOP:
-      return "STATE_EMERGENCY_STOP";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_ENGAGE:
-      return "STATE_INFORM_ENGAGE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_RESTART:
-      return "STATE_INFORM_RESTART";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_DURING_RECEIVE_ROUTE:
-      return "STATE_DURING_RECEIVE_ROUTE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_ENGAGE_INSTRUCTION:
-      return "STATE_WAITING_ENGAGE_INSTRUCTION";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_CALL_PERMISSION:
-      return "STATE_WAITING_CALL_PERMISSION";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_ARRIVED_GOAL:
-      return "STATE_ARRIVED_GOAL";
-    default:
-      return "DEFAULT";
-  }
-}
-}  // namespace
-
 WarningLampManager::WarningLampManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
 : Node("warning_lamp_manager", options)
 {
