@@ -17,35 +17,6 @@
 namespace warning_lamp_manager
 {
 
-namespace
-{
-const char * getServiceLayerStateName(uint16_t state)
-{
-  switch (state) {
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_UNDEFINED:
-      return "STATE_UNDEFINED";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_CHECK_NODE_ALIVE:
-      return "STATE_CHECK_NODE_ALIVE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_EMERGENCY_STOP:
-      return "STATE_EMERGENCY_STOP";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_ENGAGE:
-      return "STATE_INFORM_ENGAGE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_INFORM_RESTART:
-      return "STATE_INFORM_RESTART";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_DURING_RECEIVE_ROUTE:
-      return "STATE_DURING_RECEIVE_ROUTE";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_ENGAGE_INSTRUCTION:
-      return "STATE_WAITING_ENGAGE_INSTRUCTION";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_WAITING_CALL_PERMISSION:
-      return "STATE_WAITING_CALL_PERMISSION";
-    case autoware_state_machine_msgs::msg::StateMachine::STATE_ARRIVED_GOAL:
-      return "STATE_ARRIVED_GOAL";
-    default:
-      return "DEFAULT";
-  }
-}
-}  // namespace
-
 WarningLampManager::WarningLampManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
 : Node("warning_lamp_manager", options)
 {
@@ -123,10 +94,6 @@ WarningLampManager::~WarningLampManager()
 void WarningLampManager::callbackAutowareInitializationMessage(
   const autoware_adapi_v1_msgs::msg::LocalizationInitializationState::ConstSharedPtr msg)
 {
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackAutowareInitializationMessage]autoware_state: %u", msg->state);
-
   initilization_state_ = msg->state;
 
   changeState();
@@ -136,10 +103,6 @@ void WarningLampManager::callbackAutowareInitializationMessage(
 void WarningLampManager::callbackRoutingStateMessage(
   const autoware_adapi_v1_msgs::msg::RouteState::ConstSharedPtr msg)
 {
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackRoutingStateMessage]routing_state: %u", msg->state);
-
   routing_state_ = msg->state;
 
   changeState();
@@ -150,9 +113,6 @@ void WarningLampManager::callbackOperationModeStateMessage(
   const autoware_adapi_v1_msgs::msg::OperationModeState::ConstSharedPtr msg)
 {
   operation_state_ = *msg;
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackOperationModeStateMessage]operation mode: %u", msg->mode);
 
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
@@ -162,9 +122,6 @@ void WarningLampManager::callbackVehicleStateMessage(
   const go_interface_msgs::msg::VehicleStatus::ConstSharedPtr msg)
 {
   flag_calls_vehicle_voice_ = msg->voice_flg;
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackOperationModeStateMessage]vheicle voice: %u", msg->voice_flg);
 
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
@@ -173,12 +130,6 @@ void WarningLampManager::callbackVehicleStateMessage(
 void WarningLampManager::callbackDeliveryReservationMessage(
   const autoware_state_machine_msgs::msg::StateLock::ConstSharedPtr msg)
 {
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackDeliveryReservationMessage]"
-    "StateLock: %u",
-    msg->state);
-
   delivery_reservation_state_ = msg->state;
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
@@ -187,11 +138,6 @@ void WarningLampManager::callbackDeliveryReservationMessage(
 void WarningLampManager::callbackEngageProcessMessage(
   const eve_cmd_gate_msgs::msg::EngageRequestState::ConstSharedPtr msg)
 {
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackEngageProcessMessage]engage_request_state: %u, %u",
-    msg->is_engage_requesting, msg->is_engage_accepted);
-
   is_engage_requesting_ = msg->is_engage_requesting;
   is_engage_accepted_ = msg->is_engage_accepted;
   changeState();
@@ -202,10 +148,6 @@ void WarningLampManager::callbackHazardStatusMessage(
   const autoware_system_msgs::msg::HazardStatusStamped::ConstSharedPtr msg)
 {
   em_holding_ = msg->status.emergency_holding;
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackHazardStatusMessage]emergency_holding: %s",
-    em_holding_ ? "true" : "false");
 
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
@@ -215,9 +157,6 @@ void WarningLampManager::callbackMotionStateMessage(
   const autoware_adapi_v1_msgs::msg::MotionState::ConstSharedPtr msg)
 {
   motion_state_ = msg->state;
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::callbackMotionStateMessage]motion_state: %u", motion_state_);
 
   changeState();
   warningLampManager(service_layer_state_, control_layer_state_);
@@ -372,17 +311,6 @@ void WarningLampManager::changeState(void)
   } else {
     control_layer_state_ = autoware_state_machine_msgs::msg::StateMachine::AUTO;
   }
-
-  RCLCPP_INFO_THROTTLE(
-    this->get_logger(), *this->get_clock(), 1.0,
-    "[WarningLampManager::changeState] service_layer_state: %s, control_layer_state: %s, "
-    "operation_mode: %u, motion_state: %u, is_autoware_control_enabled: %s, em_holding: %s",
-    getServiceLayerStateName(service_layer_state_),
-    control_layer_state_ == autoware_state_machine_msgs::msg::StateMachine::MANUAL ? "MANUAL"
-                                                                                   : "AUTO",
-    operation_state_.mode, motion_state_,
-    operation_state_.is_autoware_control_enabled ? "true" : "false",
-    em_holding_ ? "true" : "false");
 }
 
 }  // namespace warning_lamp_manager
