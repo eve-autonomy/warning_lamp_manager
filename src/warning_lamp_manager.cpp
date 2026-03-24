@@ -53,8 +53,8 @@ WarningLampManager::WarningLampManager(const rclcpp::NodeOptions & options = rcl
     "/eve_cmd_gate/engage_request_state", rclcpp::QoS{3}.transient_local(),
     std::bind(&WarningLampManager::callbackEngageProcessMessage, this, std::placeholders::_1));
 
-  sub_hazard_status_ = this->create_subscription<autoware_system_msgs::msg::HazardStatusStamped>(
-    "/system/emergency/hazard_status", rclcpp::QoS{1},
+  sub_hazard_status_ = this->create_subscription<tier4_external_api_msgs::msg::HazardStatusStamped>(
+    "/api/external/get/hazard_status", rclcpp::QoS{1},
     std::bind(&WarningLampManager::callbackHazardStatusMessage, this, std::placeholders::_1));
 
   sub_motion_state_ = this->create_subscription<autoware_adapi_v1_msgs::msg::MotionState>(
@@ -145,7 +145,7 @@ void WarningLampManager::callbackEngageProcessMessage(
 }
 
 void WarningLampManager::callbackHazardStatusMessage(
-  const autoware_system_msgs::msg::HazardStatusStamped::ConstSharedPtr msg)
+  const tier4_external_api_msgs::msg::HazardStatusStamped::ConstSharedPtr msg)
 {
   em_holding_ = msg->status.emergency_holding;
 
