@@ -18,7 +18,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "autoware_state_machine_msgs/msg/state_lock.hpp"
 #include "autoware_state_machine_msgs/msg/state_machine.hpp"
-#include "autoware_system_msgs/msg/hazard_status_stamped.hpp"
+#include "tier4_external_api_msgs/msg/hazard_status_stamped.hpp"
 #include "dio_ros_driver/msg/dio_port.hpp"
 #include "eve_cmd_gate_msgs/msg/engage_request_state.hpp"
 #include "go_interface_msgs/msg/vehicle_status.hpp"
@@ -50,7 +50,7 @@ private:
   rclcpp::Subscription<go_interface_msgs::msg::VehicleStatus>::SharedPtr sub_calls_vehicle_state_;
   rclcpp::Subscription<autoware_state_machine_msgs::msg::StateLock>::SharedPtr sub_delivery_reservation_state_;
   rclcpp::Subscription<eve_cmd_gate_msgs::msg::EngageRequestState>::SharedPtr sub_engage_process_state_;
-  rclcpp::Subscription<autoware_system_msgs::msg::HazardStatusStamped>::SharedPtr sub_hazard_status_;
+  rclcpp::Subscription<tier4_external_api_msgs::msg::HazardStatusStamped>::SharedPtr sub_hazard_status_;
   rclcpp::Subscription<autoware_adapi_v1_msgs::msg::MotionState>::SharedPtr sub_motion_state_;
 
   uint16_t motion_state_;
@@ -80,7 +80,7 @@ private:
   void callbackEngageProcessMessage(
     const eve_cmd_gate_msgs::msg::EngageRequestState::ConstSharedPtr msg);
   void callbackHazardStatusMessage(
-    const autoware_system_msgs::msg::HazardStatusStamped::ConstSharedPtr msg);
+    const tier4_external_api_msgs::msg::HazardStatusStamped::ConstSharedPtr msg);
   void callbackMotionStateMessage(
     const autoware_adapi_v1_msgs::msg::MotionState::ConstSharedPtr msg);
 
